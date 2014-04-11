@@ -57,7 +57,7 @@ int main()
     // I chose to store groups of CLUSTERBITS TIDs paired with a single SID for each cell.
     // This means the 2D array has (0x10000 / CUSTERBITS) rows and 0x10000 columns.
     // TODO: Is it a better idea to have 0x10000 rows and (0x10000 / CLUSTERBITS) columns?
-    CLUSTER** idComboGrid = calloc(NUMROWS * 0x10000, sizeof(idComboGrid**));
+    CLUSTER** idComboGrid = calloc(NUMROWS * 0x10000, sizeof(CLUSTER));
     
     printf("DEBUG: Memory for array allocated at %x.\n", idComboGrid); // debug line
     //puts("DEBUG: Writing first cell with 0xAAAAAAAA"); // debug line
