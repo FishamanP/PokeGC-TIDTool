@@ -20,94 +20,61 @@
 #define CLUSTER unsigned int
 
 #include <stdio.h>
-#include <stdlib.h>
 
-// DO NOT MODIFY ANY OF THESE!
-// They are all essentially magic numbers required for correct operation!
-
-// The size of a cluster in bits
-const int CLUSTERBITS = sizeof(CLUSTER) * 8;
-
-// This is crude emulation of log2(CLUSTERBITS) since C is strict about constant expressions
-// It only works on primitive types 8-128 bits long inclusive, but that's good enough
-// If you don't care about getting a warning, just #import <math.h> and use log2
-const int CLUSTERSHIFT = 3 + ((sizeof(CLUSTER) >> 1) & 3) + (sizeof(CLUSTER) >> 3) + ((sizeof(CLUSTER) >= 8) * 2);
-//const int CLUSTERSHIFT = (sizeof(CLUSTER) == 1) ? 3 :
-//                         (sizeof(CLUSTER) == 2) ? 4 :
-//                         (sizeof(CLUSTER) == 4) ? 5 :
-//                         (sizeof(CLUSTER) == 8) ? 6 : 7;
-
-// The number of rows in the ID combo array
-const int NUMROWS = 0x10000 / (sizeof(CLUSTER) * 8);
-
-inline int gcrng(int input)
+static inline int gcrng(int input)
 {
     return (input * 0x343fd) + 0x269ec3;
 }
 
 int main()
 {
-    printf("DEBUG: CLUSTERBITS = %d\n", CLUSTERBITS); // debug line
-    printf("DEBUG: CLUSTERSHIFT = %d\n", CLUSTERSHIFT); // debug line
-    printf("DEBUG: NUMROWS = %d\n", NUMROWS); // debug line
-    puts("DEBUG: Program started."); // debug line
+    // This is emulating log2(sizeof(CLUSTER) * 8) since C is strict about constant expressions
+    // It only works on primitive types 8-128 bits long inclusive, but that's good enough
+    // If you don't care about getting a warning, just #import <math.h> and use log2
+    const int CLUSTERSHIFT = (sizeof(CLUSTER) == 1) ? 3 :
+                             (sizeof(CLUSTER) == 2) ? 4 :
+                             (sizeof(CLUSTER) == 4) ? 5 :
+                             (sizeof(CLUSTER) == 8) ? 6 : 7;
     
-    // The ID combos are laid out internally as a 2D array.
+    // The ID combos are laid out internally as an array of "clusters".
     // To use memory efficiently, I keep track of legal combos with a single bit each.
-    // I chose to store groups of CLUSTERBITS TIDs paired with a single SID for each cell.
-    // This means the 2D array has (0x10000 / CUSTERBITS) rows and 0x10000 columns.
-    // TODO: Is it a better idea to have 0x10000 rows and (0x10000 / CLUSTERBITS) columns?
-    CLUSTER** idComboGrid = calloc(NUMROWS * 0x10000, sizeof(CLUSTER));
+    // Groups of CLUSTERBITS SIDs for a given TID are stored in each cell.
+    // This means the array has (0x10000 / CLUSTERBITS) cells.
+    CLUSTER sidArray[0x10000 / (sizeof(CLUSTER) * 8)] = {0}; // Implicitly initializes the array
     
-    printf("DEBUG: Memory for array allocated at %x.\n", idComboGrid); // debug line
-    //puts("DEBUG: Writing first cell with 0xAAAAAAAA"); // debug line
-    //idComboGrid[0][0] = 0xAAAAAAAA; // debug line
-    printf("DEBUG: Cell read as: "); // debug line
-    printf("%x", idComboGrid[0][0]); // debug line
-    
-    register unsigned int row; // The row of the array we are currently iterating through
-    register unsigned int tidOffset; // The bit in a cluster representing the current TID
-    register unsigned int tidHigh16; // The TID we're currently checking, stored as a High16
+    register unsigned int tid; // The TID currently being processed
+    register unsigned int sid; // The SID obtained from the current seed
+    register unsigned int sidOffset; // The bit in a cluster representing the current SID
     register unsigned int i; // A disposable loop counter
-    
-    // Do a loop iteration for each row in the array (each cluster)
-    for (row = 0; row < NUMROWS; row++)
-    {
-        // Do a loop iteration for each bit in a cluster (each TID)
-        for (tidOffset = 0; tidOffset < CLUSTERBITS; tidOffset++)
-        {
-            // Compute the TID we're checking right now, and store it as high 16 bits
-            tidHigh16 = ((row << CLUSTERSHIFT) | tidOffset) << 16;
-            
-            printf("DEBUG: tidHigh16 = %x\n", tidHigh16); // debug line
-            
-            // Do a loop iteration for each RNG seed that produces this TID
-            for (i = 0; i < 0x10000; i++)
-            {
-                printf("DEBUG: Accessing idComboGrid[%d][%d], bit %d\n", row, gcrng(tidHigh16 | i) >> 16, (1 << tidOffset) - 1); // debug line
-                // Compute the SID generated from this seed, and mark the TID/SID combo as legal
-                idComboGrid[row][gcrng(tidHigh16 | i) >> 16] |= (1 << tidOffset);
-            }
-        }
-    }
     
     puts("TID/SID");
     
-    // Go back through the array and print each TID/SID combo that's wasn't marked valid
-    // Do a loop iteration for each column (each SID)
-    for (i = 0; i < 0x10000; i++)
+    // Do a loop iteration for each Trainer ID
+    for (tid = 0; tid < 0x10000; tid++)
     {
-        for (row = 0; row < NUMROWS; row++)
+        // Do a loop iteration for each RNG seed that produces this TID
+        for (i = 0; i < 0x10000; i++)
         {
-            for (tidOffset = 0; tidOffset < CLUSTERBITS; tidOffset++)
+            // Compute the SID generated from this seed, and mark the TID/SID combo as legal
+            sid = gcrng((tid << 16) | i) >> 16;
+            sidArray[sid >> CLUSTERSHIFT] |= 1 << (sid & ((sizeof(CLUSTER) * 8) - 1));
+        }
+        
+        // Go back through the array and print each TID/SID combo that's wasn't marked valid
+        // Do a loop iteration for each cell
+        for (i = 0; i < (0x10000 / (sizeof(CLUSTER) * 8)); i++)
+        {
+            // Do a loop iteration for each Secret ID
+            for (sidOffset = 0; sidOffset < (sizeof(CLUSTER) * 8); sidOffset++)
             {
-                // If this TID/SID combo is represented by a 0 bit, it's invalid
-                if (!((idComboGrid[row][i] >> tidOffset) & 1))
-                    printf("%d/%d\n", (row << CLUSTERSHIFT) | tidOffset, i);
+                // If the bit is 0, the combination was never found, and is therefore invalid
+                if (!((sidArray[i] >> sidOffset) & 1))
+                {
+                    printf("%d/%d\n", tid, ((sizeof(CLUSTER) * 8) * i) | sidOffset);
+                }
             }
         }
     }
     
-    free(idComboGrid);
     return 0;
 }
