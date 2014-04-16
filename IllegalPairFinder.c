@@ -21,7 +21,7 @@
 
 #include <stdio.h>
 
-static inline int gcrng(int input)
+static inline unsigned int gcrng(unsigned int input)
 {
     return (input * 0x343fd) + 0x269ec3;
 }
