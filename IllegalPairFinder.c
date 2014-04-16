@@ -20,6 +20,7 @@
 #define CLUSTER unsigned int
 
 #include <stdio.h>
+#include <string.h>
 
 static inline unsigned int gcrng(unsigned int input)
 {
@@ -40,7 +41,7 @@ int main()
     // To use memory efficiently, I keep track of legal combos with a single bit each.
     // Groups of CLUSTERBITS SIDs for a given TID are stored in each cell.
     // This means the array has (0x10000 / CLUSTERBITS) cells.
-    CLUSTER sidArray[0x10000 / (sizeof(CLUSTER) * 8)] = {0}; // Implicitly initializes the array
+    CLUSTER sidArray[0x10000 / (sizeof(CLUSTER) * 8)]; // Will always be 0x2000 bytes long
     
     register unsigned int tid; // The TID currently being processed
     register unsigned int sid; // The SID obtained from the current seed
@@ -52,6 +53,8 @@ int main()
     // Do a loop iteration for each Trainer ID
     for (tid = 0; tid < 0x10000; tid++)
     {
+        memset(sidArray, 0, 0x2000); // Reset the array to a fresh state
+        
         // Do a loop iteration for each RNG seed that produces this TID
         for (i = 0; i < 0x10000; i++)
         {
