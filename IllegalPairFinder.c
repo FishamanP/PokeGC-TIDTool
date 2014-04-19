@@ -20,6 +20,7 @@
 #define CLUSTER unsigned int
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static inline unsigned int gcrng(unsigned int input)
@@ -30,7 +31,7 @@ static inline unsigned int gcrng(unsigned int input)
 int main()
 {
     // This is emulating log2(sizeof(CLUSTER) * 8) since C is strict about constant expressions
-    // It only works on primitive types 8-128 bits long inclusive, but that's good enough
+    // It only works on types 8-128 bits long inclusive, but that's good enough
     // If you don't care about getting a warning, just #import <math.h> and use log2
     const int CLUSTERSHIFT = (sizeof(CLUSTER) == 1) ? 3 :
                              (sizeof(CLUSTER) == 2) ? 4 :
@@ -47,12 +48,39 @@ int main()
     register unsigned int sid; // The SID obtained from the current seed
     register unsigned int sidOffset; // The bit in a cluster representing the current SID
     register unsigned int i; // A disposable loop counter
+    char filename[23] = "IllegalPairs/"; // A buffer to hold the output filename
     
-    puts("TID/SID");
+    // The actual program code starts here
+    
+    // Make sure the user is aware of the output's huge size
+    printf("WARNING: This program will create 65536 files totaling 2.5GB on this drive.\n"
+         "Are you sure you want to proceed?\n"
+         "Enter 1 for yes, anything else for no: ");
+    if (getchar() != '1') // The user didn't enter 1
+    {
+        puts("\nOkay then. Try moving this program to a drive with more space.");
+        return 1; // Error code for "Partial success"
+    }
+    
+    // Try to create a folder for the program's output
+    if (system("mkdir IllegalPairs")) // Check if the error code is non-zero
+    {
+        puts("\nERROR: Could not create folder for output!\nExiting...");
+        return 100; // Error code for "Nothing succeeded"
+    }
     
     // Do a loop iteration for each Trainer ID
     for (tid = 0; tid < 0x10000; tid++)
     {
+        // Create the file for this TID's output
+        sprintf(filename + 13, "%d", tid); // Use the current TID as the start of the filename
+        FILE * outputFile = fopen(strcat(filename, ".txt"), "w"); // Create [tid].txt
+        if (outputFile == NULL) // The file couldn't be created
+        {
+            printf("ERROR: %s could not be created.\nExiting...\n", filename);
+            return 1; // Error code for "Partial success"
+        }
+        
         memset(sidArray, 0, 0x2000); // Reset the array to a fresh state
         
         // Do a loop iteration for each RNG seed that produces this TID
@@ -73,11 +101,15 @@ int main()
                 // If the bit is 0, the combination was never found, and is therefore invalid
                 if (!((sidArray[i] >> sidOffset) & 1))
                 {
-                    printf("%d/%d\n", tid, ((sizeof(CLUSTER) * 8) * i) | sidOffset);
+                    fprintf(outputFile, "%d\n", ((sizeof(CLUSTER) * 8) * i) | sidOffset);
                 }
             }
         }
+        
+        printf("\nFinished TID %d!", tid); // Update the user on the progress
+        fclose(outputFile); // We're done with this file, so close it
     }
     
+    puts("\nProgram successfully finished!\nExiting...");
     return 0;
 }
