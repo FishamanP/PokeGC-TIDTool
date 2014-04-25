@@ -1,2 +1,6 @@
+v1.0 (4/24/14)
+    [*] Fixed IllegalPairFinder.
+    [+] Added SeedSearcher.
+
 v0.5 (4/11/14)
     [+] Initial commit.  Broken due to a probably idiotic bug.
