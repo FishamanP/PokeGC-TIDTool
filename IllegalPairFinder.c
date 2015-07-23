@@ -91,7 +91,7 @@ int main()
             sidArray[sid >> CLUSTERSHIFT] |= 1 << (sid & ((sizeof(CLUSTER) * 8) - 1));
         }
         
-        // Go back through the array and print each TID/SID combo that's wasn't marked valid
+        // Go back through the array and print each TID/SID combo that wasn't marked valid
         // Do a loop iteration for each cell
         for (i = 0; i < (0x10000 / (sizeof(CLUSTER) * 8)); i++)
         {
