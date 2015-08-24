@@ -23,6 +23,17 @@ static inline unsigned int gcrng(unsigned int input)
     return (input * 0x343fd) + 0x269ec3;
 }
 
+static unsigned int gcrngr10000(unsigned int input)
+{
+    register unsigned int i; // Loop counter
+    
+    for (i = 0; i < 10000; i++) // 10000 is the number of frames considered "very nearby"
+    {
+        input = (input * 0xb9b33155) + 0xa170f641; // This reverses the GCRNG equation
+    }
+    return input;
+}
+
 static unsigned int distanceToSeed(unsigned int startSeed, unsigned int targetSeed)
 {
     register unsigned int distance;
@@ -48,7 +59,8 @@ int main()
     printf("Select from the following functionality:\n");
     printf("1. Distance to seed\n");
     printf("2. Custom TID\n");
-    printf("3. Make PID shiny\n\n");
+    printf("3. Make PID shiny\n");
+    printf("4. TID offset from target\n\n");
     
     matches = 0;
     do // Get the choice the user wants
@@ -57,12 +69,19 @@ int main()
         matches = scanf("%u", &choiceValue); // Matches isn't meant to be used like this, but whatever
         flush(); // Flush the input so we can check for a newline properly
     }
-    while (!(matches && (choiceValue < 4) && (choiceValue != 0))); // Verify that the user entered a valid choice
+    while (!(matches && (choiceValue < 5) && (choiceValue != 0))); // Verify that the user entered a valid choice
     
     matches = 0;
     do // Get the current seed
     {
-        printf("Current seed: ");
+        if (choiceValue == 4)
+        {
+            printf("Target seed: 0x");
+        }
+        else
+        {
+            printf("Current seed: 0x");
+        }
         matches = scanf("%x", &currSeed); // Matches isn't meant to be used like this, but whatever
         flush(); // Flush the input so we can check for a newline properly
     }
@@ -77,7 +96,7 @@ int main()
             matches = 0;
             do // Get the target seed
             {
-                printf("Target seed: ");
+                printf("Target seed: 0x");
                 matches = scanf("%x", &targetSeed); // Matches isn't meant to be used like this, but whatever
                 flush(); // Flush the input so we can check for a newline properly
             }
@@ -156,6 +175,55 @@ int main()
             if (matches == 0)
             {
                 printf("Sorry, no nearby seeds will make that PID shiny.\n");
+            }
+            break;
+        }
+        
+        case 4: // TID offset from target
+        {
+            unsigned int tid; // The Trainer ID the user actually got
+            int distance; // The number of frames the user was off
+            
+            matches = 0;
+            do // Get the Trainer ID
+            {
+                printf("Actual Trainer ID: ");
+                matches = scanf("%u", &tid); // Matches isn't meant to be used like this, but whatever
+                flush(); // Flush the input so we can check for a newline properly
+            }
+            while (!(matches && (tid < 0x10000))); // Verify that the user entered a valid TID
+            
+            if ((currSeed >> 16) == tid) // The target seed produces the TID the user got
+            {
+                printf("Error: You got your target Trainer ID!\n");
+                break;
+            }
+            
+            matches = 0;
+            currSeed = gcrngr10000(currSeed); // Rewind the RNG to find earlier seeds
+            for (distance = 9999; distance > 0; distance--)
+            {
+                currSeed = gcrng(currSeed);
+                if ((currSeed >> 16) == tid) // A possible match was found
+                {
+                    printf("%u/%u: %u frames early\n", tid, gcrng(currSeed) >> 16, distance);
+                    matches++;
+                }
+            }
+            currSeed = gcrng(currSeed); // Consume the RNG frame for the target seed
+            for (distance = 1; distance < 10000; distance++)
+            {
+                currSeed = gcrng(currSeed);
+                if ((currSeed >> 16) == tid) // A possible match was found
+                {
+                    printf("%u/%u: %u frames late\n", tid, gcrng(currSeed) >> 16, distance);
+                    matches++;
+                }
+            }
+            
+            if (matches == 0)
+            {
+                printf("Sorry, no nearby seeds give that Trainer ID.\n");
             }
             break;
         }

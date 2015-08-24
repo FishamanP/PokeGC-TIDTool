@@ -23,11 +23,11 @@ static inline unsigned int gcrng(unsigned int input)
 static unsigned int gcrngr1100(unsigned int input)
 {
     register unsigned int i; // Loop counter
+    
     for (i = 0; i < 1100; i++) // 1100 is the approximate delay for actual TID/SID abuse
     {
         input = (input * 0xb9b33155) + 0xa170f641; // This reverses the GCRNG equation
     }
-    
     return input;
 }
 
